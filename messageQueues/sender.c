@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         fgets(msg.text, MAX_TEXT, stdin);
-        msg.text[strcspn(msg.text, "\n")] = '\0'; // Remove newline character
+        msg.text[strcspn(msg.text, "\n")] = '\0';
         if (msgsnd(msgid, &msg, sizeof(struct message) - sizeof(long), 0) == -1) {
             perror("msgsnd");
         }
