@@ -1,49 +1,44 @@
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <mqueue.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <unistd.h>
 
-#define MQ_NAME "/chat_queue"
-#define MQ_MSGSIZE 1024
+#define MAX_TEXT 512
 
-struct msg_buffer {
-    long msg_type;
-    char msg_text[MQ_MSGSIZE];
+struct message {
+    long int message_type;
+    char username[20];
+    char text[MAX_TEXT];
 };
 
-int main(int argc, char *argv[]){
-
-    mqd_t mq;
-
-    struct mq_attr attributes = {
-        .mq_flags = 0, 
-        .mq_maxmsg = 10,
-        .mq_curmsgs = 0, 
-        .mq_msgsize = 1024
-    };
-
-    mq = mq_open(MQ_NAME, O_WRONLY, 0644, &attributes);
-    if (mq == (mqd_t)-1) {
-        perror("mq_open");
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        printf("Usage: %s <username> <key>\n", argv[0]);
         exit(1);
     }
 
-    printf("Message queue opened successfully.\n");
+    char *username = argv[1];
+    int key = atoi(argv[2]);
 
-    char buffer[1024];
+    int msgid;
+    struct message msg;
+    key_t ipc_key = ftok("chat_server", 65);
+    msgid = msgget(ipc_key, 0666 | IPC_CREAT);
 
-    strcpy(buffer, "Hello, Message Queue!");
-    if (mq_send(mq, buffer, strlen(buffer) +1, 0) == -1) {
-        perror("mq_send");
-        exit(1);
+    printf("Chat client send started for %s.\n", username);
+
+    msg.message_type = 1;
+    strcpy(msg.username, username);
+
+    while (1) {
+        fgets(msg.text, MAX_TEXT, stdin);
+        msg.text[strcspn(msg.text, "\n")] = '\0'; // Remove newline character
+        if (msgsnd(msgid, &msg, sizeof(struct message) - sizeof(long), 0) == -1) {
+            perror("msgsnd");
+        }
     }
-
-    printf("Message sent: %s\n", buffer);
-
-
-
 
     return 0;
 }

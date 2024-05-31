@@ -1,49 +1,46 @@
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <mqueue.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <unistd.h>
 
-#define MQ_NAME "/chat_queue"
-#define MQ_MSGSIZE 1024
+#define MAX_TEXT 512
 
-struct msg_buffer {
-    long msg_type;
-    char msg_text[MQ_MSGSIZE];
+struct message {
+    long int message_type;
+    char username[20];
+    char text[MAX_TEXT];
 };
 
-int main(int argc, char *argv[]){
-
-    mqd_t mq;
-
-    struct mq_attr attributes = {
-        .mq_flags = 0, 
-        .mq_maxmsg = 10,
-        .mq_curmsgs = 0, 
-        .mq_msgsize = MQ_MSGSIZE
-    };
-
-    mq = mq_open(MQ_NAME, O_RDONLY, 0644, &attributes);
-    if (mq == (mqd_t)-1) {
-        perror("mq_open");
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s <username>\n", argv[0]);
         exit(1);
     }
 
-    printf("Message queue opened successfully.\n");
-
-    struct msg_buffer message;
-    unsigned int priority;
-
-    ssize_t bytes_read = mq_receive(mq, (char *)&message.msg_text, attributes.mq_msgsize, &priority);
-    if (bytes_read == -1) {
-        perror("mq_receive");
+    char *username = argv[1];
+    int user_id = 0;
+    if (strcmp(username, "user1") == 0) user_id = 0;
+    else if (strcmp(username, "user2") == 0) user_id = 1;
+    else if (strcmp(username, "user3") == 0) user_id = 2;
+    else {
+        printf("Invalid username. Choose from user1, user2, user3.\n");
         exit(1);
     }
 
-    printf("Received message: %s\n", message.msg_text);
+    int msgid;
+    struct message msg;
+    key_t key = ftok("chat_server", 65);
+    msgid = msgget(key, 0666 | IPC_CREAT);
 
-
+    printf("Chat client display started for %s. Key: %d\n", username, user_id + 2);
+    
+    while (1) {
+        if (msgrcv(msgid, &msg, sizeof(struct message) - sizeof(long), user_id + 2, 0) != -1) {
+            printf("[%s]: %s\n", msg.username, msg.text);
+        }
+    }
 
     return 0;
 }
